@@ -789,7 +789,7 @@ public:
         { r.encode(writer, version) } -> std::same_as<void>;
     }
     kafka::request_context make_request_context(
-      RequestType request, kafka::request_header& header, conn_ptr conn = {}) {
+      RequestType& request, kafka::request_header& header, conn_ptr conn = {}) {
         if (!conn) {
             conn = make_connection_context();
         }
