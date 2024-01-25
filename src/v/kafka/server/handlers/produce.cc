@@ -77,7 +77,6 @@ produce_response produce_request::make_full_disk_response() const {
     return resp;
 }
 
-
 struct topic_produce_stages {
     ss::future<> dispatched;
     ss::future<produce_response::topic> produced;

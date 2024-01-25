@@ -38,7 +38,6 @@ struct produce_ctx {
       , ssg(ssg) {}
 };
 
-
 /*
  * Unit Tests Exposure
  */
@@ -47,9 +46,10 @@ namespace testing {
 /**
  * Exposed for testing/benchmarking only.
  */
- kafka::partition_produce_stages produce_single_partition(produce_ctx& octx,
-   produce_request::topic& topic,
-   produce_request::partition& part);
+kafka::partition_produce_stages produce_single_partition(
+  produce_ctx& octx,
+  produce_request::topic& topic,
+  produce_request::partition& part);
 
 } // namespace testing
 } // namespace kafka

@@ -10,13 +10,13 @@
  */
 #include "kafka/client/types.h"
 #include "kafka/protocol/fetch.h"
-#include "kafka/protocol/types.h"
 #include "kafka/protocol/schemata/produce_request.h"
+#include "kafka/protocol/types.h"
 #include "kafka/server/handlers/produce.h"
 #include "kafka/types.h"
 #include "model/fundamental.h"
-#include "random/generators.h"
 #include "model/record.h"
+#include "random/generators.h"
 #include "redpanda/tests/fixture.h"
 #include "test_utils/fixture.h"
 
@@ -66,41 +66,43 @@ struct produce_partition_fixture : redpanda_thread_fixture {
 
 PERF_TEST_F(produce_partition_fixture, test_produce_partition) {
     // make the fetch topic
-//    kafka::fetch_topic ft;
-//    ft.name = t;
+    //    kafka::fetch_topic ft;
+    //    ft.name = t;
 
-//    // add the partitions to the fetch request
-//    for (int pid = 0; pid < session_partition_count; pid++) {
-//        kafka::fetch_partition fp;
-//        fp.partition_index = model::partition_id(pid);
-//        fp.fetch_offset = model::offset(0);
-//        fp.current_leader_epoch = kafka::leader_epoch(-1);
-//        fp.log_start_offset = model::offset(-1);
-//        fp.max_bytes = 1048576;
-//        ft.fetch_partitions.push_back(std::move(fp));
-//    }
+    //    // add the partitions to the fetch request
+    //    for (int pid = 0; pid < session_partition_count; pid++) {
+    //        kafka::fetch_partition fp;
+    //        fp.partition_index = model::partition_id(pid);
+    //        fp.fetch_offset = model::offset(0);
+    //        fp.current_leader_epoch = kafka::leader_epoch(-1);
+    //        fp.log_start_offset = model::offset(-1);
+    //        fp.max_bytes = 1048576;
+    //        ft.fetch_partitions.push_back(std::move(fp));
+    //    }
 
     BOOST_TEST_CHECKPOINT("HERE");
 
     // model::record_batch batch;
 
-    model::topic_partition tp = model::topic_partition(t, model::partition_id(0));
-    std::vector<kafka::produce_request::partition> partitions;
-    // partitions.emplace_back(kafka::produce_request::partition{
-    //   .partition_index{tp.partition},
-    //   .records = produce_request_record_data(std::move(batch))});
+    model::topic_partition tp = model::topic_partition(
+      t, model::partition_id(0));
 
-    storage::record_batch_builder builder(model::record_batch_type::raft_data, model::offset{0});
+    storage::record_batch_builder builder(
+      model::record_batch_type::raft_data, model::offset{0});
     for (size_t i = 0; i < 1; ++i) {
-      ss::sstring s = fmt::format("key{}", i);
-      auto buf = iobuf();
-      buf.append(s.data(), s.size());
-      builder.add_raw_kv(buf, iobuf());
+        builder.add_raw_kv(iobuf{}, iobuf{});
     }
 
+    auto batch = std::move(builder).build();
+
+    // TODO(mfleming) Hack. This shouldn't be necessary but avoids a vassert()
+    // in segment_appender.cc. See storage::disk_header_to_iobuf().
+    // batch.header().size_bytes = model::packed_record_batch_header_size;
+
+    std::vector<kafka::produce_request::partition> partitions;
     partitions.push_back(kafka::produce_request::partition{
       .partition_index{model::partition_id(0)},
-      .records = kafka::produce_request_record_data(std::move(builder).build())});
+      .records = kafka::produce_request_record_data(std::move(batch))});
 
     std::vector<kafka::produce_request::topic> topics;
     topics.push_back(kafka::produce_request::topic{
@@ -108,7 +110,8 @@ PERF_TEST_F(produce_partition_fixture, test_produce_partition) {
 
     std::optional<ss::sstring> t_id;
     auto acks = -1;
-    kafka::produce_request produce_req = kafka::produce_request(t_id, acks, std::move(topics));
+    kafka::produce_request produce_req = kafka::produce_request(
+      t_id, acks, std::move(topics));
 
     BOOST_TEST_CHECKPOINT("HERE");
 
@@ -118,53 +121,28 @@ PERF_TEST_F(produce_partition_fixture, test_produce_partition) {
 
     BOOST_TEST_CHECKPOINT("HERE");
 
-    // use this initial request to populate the fetch session
-    // in the session cache
-    // kafka::fetch_session_id sess_id;
-    // {
-    //     auto rctx = make_request_context(fetch_req, conn);
-    //     // set up a fetch session
-    //     auto ctx = rctx.fetch_sessions().maybe_get_session(fetch_req);
-    //     BOOST_REQUIRE_EQUAL(ctx.has_error(), false);
-    //     // first fetch has to be full fetch
-    //     BOOST_REQUIRE_EQUAL(ctx.is_full_fetch(), true);
-    //     BOOST_REQUIRE_EQUAL(ctx.is_sessionless(), false);
-
-    //     BOOST_REQUIRE_EQUAL(
-    //       ctx.session()->partitions().size(), session_partition_count);
-
-    //     sess_id = ctx.session()->id();
-    //     BOOST_REQUIRE(sess_id > 0);
-    // }
-
-    // BOOST_TEST_CHECKPOINT("HERE");
-
-    // fetch_req.data.session_id = sess_id;
-    // fetch_req.data.session_epoch = 1;
-    // fetch_req.data.topics.clear();
-
     kafka::request_header header{
       .key = kafka::produce_handler::api::key,
       .version = kafka::produce_handler::max_supported};
 
     auto rctx = make_request_context(produce_req, header, conn);
 
-//    BOOST_REQUIRE_EQUAL(rctx.fetch_sessions().size(), 1);
-
     // add all partitions to fetch metadata
-//    auto& mdc = rctx.get_fetch_metadata_cache();
-//    for (int i = 0; i < total_partition_count; i++) {
-//        mdc.insert_or_assign(
-//          {t, i}, model::offset(0), model::offset(100), model::offset(100));
-//    }
+    //    auto& mdc = rctx.get_fetch_metadata_cache();
+    //    for (int i = 0; i < total_partition_count; i++) {
+    //        mdc.insert_or_assign(
+    //          {t, i}, model::offset(0), model::offset(100),
+    //          model::offset(100));
+    //    }
 
-//    vassert(mdc.size() == total_partition_count, "mdc.size(): {}", mdc.size());
+    //    vassert(mdc.size() == total_partition_count, "mdc.size(): {}",
+    //    mdc.size());
 
-//    auto octx = kafka::op_context(
-//      std::move(rctx), ss::default_smp_service_group());
-//
-//    BOOST_REQUIRE(!octx.session_ctx.is_sessionless());
-//    BOOST_REQUIRE_EQUAL(octx.session_ctx.session()->id(), sess_id);
+    //    auto octx = kafka::op_context(
+    //      std::move(rctx), ss::default_smp_service_group());
+    //
+    //    BOOST_REQUIRE(!octx.session_ctx.is_sessionless());
+    //    BOOST_REQUIRE_EQUAL(octx.session_ctx.session()->id(), sess_id);
 
     BOOST_TEST_CHECKPOINT("HERE");
 
@@ -176,29 +154,48 @@ PERF_TEST_F(produce_partition_fixture, test_produce_partition) {
       kafka::produce_response{},
       ss::default_smp_service_group()};
 
+    std::vector<ss::future<>> dispatched;
+    std::vector<ss::future<kafka::produce_response::partition>> produced;
     perf_tests::start_measuring_time();
     for (size_t i = 0; i < iters; i++) {
-        vassert(pctx.request.data.topics.size() == 1, "topics.size(): {}", pctx.request.data.topics.size());
+        vassert(
+          pctx.request.data.topics.size() == 1,
+          "topics.size(): {}",
+          pctx.request.data.topics.size());
         auto& topic = pctx.request.data.topics.front();
-        vassert(topic.partitions.size() == 1, "partitions.size(): {}", topic.partitions.size());
+        vassert(
+          topic.partitions.size() == 1,
+          "partitions.size(): {}",
+          topic.partitions.size());
         auto& partition = topic.partitions.front();
 
-        auto stages = kafka::testing::produce_single_partition(pctx, topic, partition);
+        auto stages = kafka::testing::produce_single_partition(
+          pctx, topic, partition);
         perf_tests::do_not_optimize(stages);
 
-        // Check stages does not have errors
-        // In future we want to move this outside of the critical measuring loop
-        vassert(!stages.dispatched.failed(), "stages.dispatched.failed(): {}",stages.dispatched.failed()); 
-        vassert(!stages.produced.failed(),"stages.produced.failed(): {}",stages.produced.failed());
-        vassert(stages.produced.get0().error_code == kafka::error_code::none, "stages.produced.get0().error_code: {}", stages.produced.get0().error_code);
+        dispatched.push_back(std::move(stages.dispatched));
+        produced.push_back(std::move(stages.produced));
     }
     perf_tests::stop_measuring_time();
 
-    // vassert(
-    //   mdc.size() == total_partition_count,
-    //   "mdc.size(): {}",
-    //   mdc.size()); // check that nothing was evicted
-
+    return ss::when_all_succeed(dispatched.begin(), dispatched.end())
+      .then_wrapped([produced = std::move(produced)](ss::future<> f) mutable {
+          try {
+              f.get();
+              return when_all_succeed(produced.begin(), produced.end())
+                .then(
+                  [&](std::vector<kafka::produce_response::partition> partitions) {
+                      for (const auto& p : partitions) {
+                          vassert(
+                            p.error_code == kafka::error_code::none,
+                            "error_code: {}",
+                            p.error_code);
+                      }
+                  });
+          } catch (...) {
+              vassert(false, "exception: {}", std::current_exception());
+          }
+      });
     // double micros_per_iter = timer._total_duration / 1ns / 1000.
     //                          / timer._total_timings;
     // fmt::print(
@@ -217,5 +214,5 @@ PERF_TEST_F(produce_partition_fixture, test_produce_partition) {
     // for (auto& sf : plan.fetches_per_shard) {
     //     fmt::print("FPT plan: {}\n", sf);
     // }
-    return (size_t)(session_partition_count * iters);
+    // return (size_t)(session_partition_count * iters);
 }
