@@ -64,7 +64,7 @@ struct produce_partition_fixture : redpanda_thread_fixture {
     }
 };
 
-PERF_TEST_F(produce_partition_fixture, test_produce_partition) {
+PERF_TEST_C(produce_partition_fixture, test_produce_partition) {
     // make the fetch topic
     //    kafka::fetch_topic ft;
     //    ft.name = t;
@@ -125,7 +125,10 @@ PERF_TEST_F(produce_partition_fixture, test_produce_partition) {
       .key = kafka::produce_handler::api::key,
       .version = kafka::produce_handler::max_supported};
 
-    auto rctx = make_request_context(produce_req, header, conn);
+    // Use a fake_req to generate the context because encoding the request
+    // steals the request's iobufs.
+    kafka::produce_request fake_req;
+    auto rctx = make_request_context(fake_req, header, conn);
 
     // add all partitions to fetch metadata
     //    auto& mdc = rctx.get_fetch_metadata_cache();
@@ -146,7 +149,7 @@ PERF_TEST_F(produce_partition_fixture, test_produce_partition) {
 
     BOOST_TEST_CHECKPOINT("HERE");
 
-    constexpr size_t iters = 10000; // 0000000U;
+    constexpr size_t iters = 1; // 10000; // 0000000U;
 
     kafka::produce_ctx pctx{
       std::move(rctx),
@@ -178,7 +181,7 @@ PERF_TEST_F(produce_partition_fixture, test_produce_partition) {
     }
     perf_tests::stop_measuring_time();
 
-    return ss::when_all_succeed(dispatched.begin(), dispatched.end())
+    co_await ss::when_all_succeed(dispatched.begin(), dispatched.end())
       .then_wrapped([produced = std::move(produced)](ss::future<> f) mutable {
           try {
               f.get();
@@ -196,23 +199,4 @@ PERF_TEST_F(produce_partition_fixture, test_produce_partition) {
               vassert(false, "exception: {}", std::current_exception());
           }
       });
-    // double micros_per_iter = timer._total_duration / 1ns / 1000.
-    //                          / timer._total_timings;
-    // fmt::print(
-    //   "FPT {} iters, {} micros/iter micros/part {}\n",
-    //   timer._total_timings,
-    //   micros_per_iter,
-    //   micros_per_iter / session_partition_count);
-
-    // auto plan = kafka::make_simple_fetch_plan(octx);
-    // auto& pfps = plan.fetches_per_shard;
-    // fmt::print("FPT plan count: {}\n", pfps.size());
-    // if (pfps.size()) {
-    //     fmt::print("FPT plan[0] parts: {}\n", pfps[0].requests.size());
-    // }
-
-    // for (auto& sf : plan.fetches_per_shard) {
-    //     fmt::print("FPT plan: {}\n", sf);
-    // }
-    // return (size_t)(session_partition_count * iters);
 }
